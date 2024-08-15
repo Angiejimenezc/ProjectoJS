@@ -30,6 +30,7 @@
             margin-bottom: 16px;
 
             overflow-y: auto;
+            scroll-behavior: smooth;
         }
 
         ul {
@@ -104,16 +105,36 @@
                 padding: 8px;
                 transition: background .3s ease;
 
+                &[disabled] {
+                    background: #ccc;
+                    opacity: .6;
+                    pointer-events: none;
+                }
+
                 &:hover {
                     background: rgb(0, 104, 173);
                 }
             }
         }
+
+        small {
+            font-size: 10px;
+            color: #999;
+            position: fixed;
+            bottom: 10px;
+            right: 0;
+            left: 0;
+            margin: auto;
+            width: 400px;
+
+        }
     </style>
 
     <script type="module">
+        import {CreateMLCEngine} from "https://esm.run/@mlc-ai/web-llm"
 
         const $ = el => document.querySelector(el)
+
         //pongo delante de la variable un simbolo de $ para indicar que es un elemento del DOM
         const $form = $('form')
         const $input = $('input')
@@ -121,20 +142,72 @@
         const $messages = $('ul')
         const $container = $('main')
         const $button = $('button')
+        const $info = $('small')
 
-        $form.addEventListener('submit', (event) => {
+        let messages = []
+
+        const SELECTED_MODEL = 'gemma-2-2b-it-q4f32_1-MLC'
+
+        const engine = await CreateMLCEngine(
+            SELECTED_MODEL, {
+            initProgressCallback: (info) => {
+                console.log('initProgressCallback', info)
+                $info.textContent = `Cargando modelo... ${info.text}%`
+                if (info.progress === 1) {
+                    $button.removeAttribute('disabled')
+                }
+            },
+        }
+        )
+
+        $form.addEventListener('submit', async (event) => {
             event.preventDefault()
             const messageText = $input.value.trim()
 
             if (messageText !== '') {
-               //añadimos el mensaje del DOM 
-               $input.value = ''
+                //añadimos el mensaje del DOM 
+                $input.value = ''
             }
 
             addMessage(messageText, 'user')
+            $button.setAttribute('disabled', '')
+
+            const userMessage = {
+                role: 'user',
+                content: messageText
+            }
+            messages.push(userMessage)
+
+            const chunks = await engine.chat.completions.create({
+                messages , 
+                stream: true
+            })
+
+            let replay = ''
+
+            const $botMessage = addMessage('Escribiendo...', 'bot')
+
+            for await (const chunk of chunks) {
+                const [choise] = chunk.choices
+                const content = choise?.delta?.content ?? ""
+                replay += content   
+                $botMessage.textContent = replay	
+            
+            }
+
+            $button.removeAttribute('disabled')           
+            messages.push({
+                role: 'assistant',
+                content: replay
+            }
+            
+            )
+          
         })
 
-        function addMessage(text , sender) {
+
+
+        function addMessage(text, sender) {
             //clonamos el template
             const clonedTemplate = $template.content.cloneNode(true)
             //recuperamos el mensaje del template
@@ -147,53 +220,34 @@
             $text.textContent = text
             $who.textContent = sender === 'bot' ? 'GPT' : 'Tú'
             $newMessage.classList.add(sender)
-            
+
             $messages.appendChild($newMessage)
-            
+
             $container.scrollTop = $container.scrollHeight
+
+            return $text
 
         }
     </script>
-
-
 </head>
-
 <body>
     <main>
         <ul>
-            <li class="message bot">
-                <span>
-                    GPT
-                </span>
-                <p>
-                    Respuesta del bot
-                </p>
-            </li>
-            <li class="message user">
-                <span>
-                    Tú
-                </span>
-                <p>
-                    Respuesta del user
-                </p>
-            </li>
-            <li class="message user">
-                <span>
-                    Tú
-                </span>
-                <p>
-                    Respuesta larga para comprobar que no se rompe nada
-                </p>
-            </li>
+         
+           
         </ul>
     </main>
 
     <form>
         <input placeholder="Escribe tu mensaje aquí...">
-        <button>
+        <button disabled>
             Enviar
         </button>
     </form>
+
+    <small>
+        &nbsp;
+    </small>
 
     <template id="message-template">
         <li class="message">
