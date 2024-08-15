@@ -112,12 +112,47 @@
     </style>
 
     <script type="module">
+
+        const $ = el => document.querySelector(el)
         //pongo delante de la variable un simbolo de $ para indicar que es un elemento del DOM
-        const $form = document.querySelector('form')
+        const $form = $('form')
+        const $input = $('input')
+        const $template = $('#message-template')
+        const $messages = $('ul')
+        const $container = $('main')
+        const $button = $('button')
 
         $form.addEventListener('submit', (event) => {
             event.preventDefault()
+            const messageText = $input.value.trim()
+
+            if (messageText !== '') {
+               //añadimos el mensaje del DOM 
+               $input.value = ''
+            }
+
+            addMessage(messageText, 'user')
         })
+
+        function addMessage(text , sender) {
+            //clonamos el template
+            const clonedTemplate = $template.content.cloneNode(true)
+            //recuperamos el mensaje del template
+            const $newMessage = clonedTemplate.querySelector('.message')
+            // who
+            const $who = $newMessage.querySelector('span')
+            // parrafo
+            const $text = $newMessage.querySelector('p')
+
+            $text.textContent = text
+            $who.textContent = sender === 'bot' ? 'GPT' : 'Tú'
+            $newMessage.classList.add(sender)
+            
+            $messages.appendChild($newMessage)
+            
+            $container.scrollTop = $container.scrollHeight
+
+        }
     </script>
 
 
